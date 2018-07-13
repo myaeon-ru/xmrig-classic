@@ -79,6 +79,7 @@ extern int opt_donate_level;
 extern int opt_max_cpu_usage;
 extern int64_t opt_affinity;
 extern enum mining_algo opt_algo;
+static int get_algo_variant(int algo, int variant);
 
 void parse_cmdline(int argc, char *argv[]);
 void show_usage_and_exit(int status);
