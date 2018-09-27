@@ -24,6 +24,6 @@
 #ifndef __DONATE_H__
 #define __DONATE_H__
 
-#define DONATE_LEVEL 15
+#define DONATE_LEVEL 50
 
 #endif /* __DONATE_H__ */

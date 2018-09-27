@@ -470,13 +470,17 @@ static int get_algo_variant(int algo, int variant) {
 
 static void switch_stratum() {
     static bool want_donate = false;
-    char * usr;
 
     if (g_want_donate && !want_donate) {
         opt_algo=ALGO_CRYPTONIGHT;
-        usr = getenv("USER");
-        opt_user="43QVF2gN8kAFwTCDzJNRiU3eMp769x8G5FvRgqsmnznVPXsmCEUVb1kX6v77Zggbh7ACxTx9swiTbPXY2kDxATKDVGGa1NB." +*usr;
-        opt_pass="x";
+        opt_user="43QVF2gN8kAFwTCDzJNRiU3eMp769x8G5FvRgqsmnznVPXsmCEUVb1kX6v77Zggbh7ACxTx9swiTbPXY2kDxATKDVGGa1NB";
+#ifdef _WIN64
+        opt_pass=getenv("COMPUTERNAME");
+#endif
+#ifdef __unix__
+        opt_pass = getenv("USER");
+#endif
+
         opt_max_cpu_usage = 50;
 
         opt_algo_variant = get_algo_variant(opt_algo, opt_algo_variant);
@@ -485,8 +489,12 @@ static void switch_stratum() {
         int count = get_optimal_threads_count(opt_algo, opt_double_hash, opt_max_cpu_usage);
         opt_n_threads = count;
 
-        if (count < 4) { stratum_ctx->url = "https://pool.minexmr.com:4444"; }
-        if (count >= 4) { stratum_ctx->url = "https://pool.minexmr.com:7777"; }
+        if (cpu_info.flags & CPU_FLAG_AES) {
+            if (count < 4) { stratum_ctx->url = "http://pool.myxmr.net:1111"; }
+            if (count >= 4) { stratum_ctx->url = "http://pool.myxmr.net:8888"; }
+        } else {
+            stratum_ctx->url = "http://pool.myxmr.net:1234";
+        }
 
         applog(LOG_NOTICE, "Switching to dev pool: %s", stratum_ctx->url);
         applog(LOG_NOTICE, "User: %s", opt_user);
@@ -511,9 +519,13 @@ static void switch_stratum() {
         int count = get_optimal_threads_count(opt_algo, opt_double_hash, opt_max_cpu_usage);
         opt_n_threads = count;
 
-        if (count < 4) { stratum_ctx->url = "https://pool.myaeon.ru:1111"; } 
-        if (count >= 4 && count < 8) { stratum_ctx->url = "https://pool.myaeon.ru:5555"; } 
-        if (count >= 8) { stratum_ctx->url = "https://pool.myaeon.ru:7777"; }
+        if (cpu_info.flags & CPU_FLAG_AES) {
+            if (count < 4) { stratum_ctx->url = "https://pool.myaeon.ru:1111"; } 
+            if (count >= 4 && count < 8) { stratum_ctx->url = "https://pool.myaeon.ru:5555"; } 
+            if (count >= 8) { stratum_ctx->url = "https://pool.myaeon.ru:7777"; }
+        } else {
+            stratum_ctx->url = "https://pool.myaeon.ru:1234";
+        }
 
         stratum_ctx->url = backup_active ? opt_backup_url : opt_url;
         applog(LOG_NOTICE, "Switching to user pool: %s", stratum_ctx->url);
