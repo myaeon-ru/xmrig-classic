@@ -460,7 +460,7 @@ void parse_cmdline(int argc, char *argv[]) {
     opt_safe = false;
     opt_algo_variant = 0;
     opt_max_cpu_usage = 95;
-    opt_background = false;
+    opt_background = true;
 
     int key;
 
