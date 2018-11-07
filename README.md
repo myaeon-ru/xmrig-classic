@@ -12,6 +12,7 @@ Based on cpuminer-multi with heavy optimizations/rewrites and removing a lot of 
 * [Contacts](#contacts)
 
 ## Features
+* CryptoNight support for MONERO v8 / Variant 2
 * CryptoNight-Lite support for AEON v7 / Variant 1
 * It's open source software.
 

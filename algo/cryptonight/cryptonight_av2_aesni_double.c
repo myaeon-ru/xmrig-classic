@@ -36,14 +36,14 @@ void cryptonight_av2_aesni_double(const void *restrict input, size_t size, void 
 {
     keccak((const uint8_t *) input,        size, ctx->state0, 200);
     keccak((const uint8_t *) input + size, size, ctx->state1, 200);
-
-    VARIANT1_INIT(0);
-    VARIANT1_INIT(1);
-
     const uint8_t* l0 = ctx->memory;
     const uint8_t* l1 = ctx->memory + MEMORY;
     uint64_t* h0 = (uint64_t*) ctx->state0;
     uint64_t* h1 = (uint64_t*) ctx->state1;
+
+    VARIANT2_INIT(0);
+    VARIANT2_INIT(1);
+    VARIANT2_SET_ROUNDING_MODE();
 
     cn_explode_scratchpad((__m128i*) h0, (__m128i*) l0);
     cn_explode_scratchpad((__m128i*) h1, (__m128i*) l1);
@@ -53,43 +53,43 @@ void cryptonight_av2_aesni_double(const void *restrict input, size_t size, void 
     uint64_t ah0 = h0[1] ^ h0[5];
     uint64_t ah1 = h1[1] ^ h1[5];
 
-    __m128i bx0 = _mm_set_epi64x(h0[3] ^ h0[7], h0[2] ^ h0[6]);
-    __m128i bx1 = _mm_set_epi64x(h1[3] ^ h1[7], h1[2] ^ h1[6]);
+    __m128i bx00 = _mm_set_epi64x(h0[3] ^ h0[7], h0[2] ^ h0[6]);
+    __m128i bx01 = _mm_set_epi64x(h0[9] ^ h0[11], h0[8] ^ h0[10]);
+    __m128i bx10 = _mm_set_epi64x(h1[3] ^ h1[7], h1[2] ^ h1[6]);
+    __m128i bx11 = _mm_set_epi64x(h1[9] ^ h1[11], h1[8] ^ h1[10]);
 
-    uint64_t idx0 = h0[0] ^ h0[4];
-    uint64_t idx1 = h1[0] ^ h1[4];
+    uint64_t idx0 = al0;
+    uint64_t idx1 = al1;
 
     for (size_t i = 0; __builtin_expect(i < 0x80000, 1); i++) {
         __m128i cx0 = _mm_load_si128((__m128i *) &l0[idx0 & 0x1FFFF0]);
         __m128i cx1 = _mm_load_si128((__m128i *) &l1[idx1 & 0x1FFFF0]);
 
-        cx0 = _mm_aesenc_si128(cx0, _mm_set_epi64x(ah0, al0));
-        cx1 = _mm_aesenc_si128(cx1, _mm_set_epi64x(ah1, al1));
+        const __m128i ax0 = _mm_set_epi64x(ah0, al0);
+        const __m128i ax1 = _mm_set_epi64x(ah1, al1);
 
-        _mm_store_si128((__m128i *) &l0[idx0 & 0x1FFFF0], _mm_xor_si128(bx0, cx0));
-        _mm_store_si128((__m128i *) &l1[idx1 & 0x1FFFF0], _mm_xor_si128(bx1, cx1));
+        cx0 = _mm_aesenc_si128(cx0, ax0);
+        cx1 = _mm_aesenc_si128(cx1, ax1);
 
-        VARIANT1_1(&l0[idx0 & 0x1FFFF0]);
-        VARIANT1_1(&l1[idx1 & 0x1FFFF0]);
+        VARIANT2_SHUFFLE(l0, idx0 & 0x1FFFF0, ax0, bx00, bx01);
+        _mm_store_si128((__m128i *) &l0[idx0 & 0x1FFFF0], _mm_xor_si128(bx00, cx0));
 
-        idx0 = EXTRACT64(cx0);
-        idx1 = EXTRACT64(cx1);
+        VARIANT2_SHUFFLE(l1, idx1 & 0x1FFFF0, ax1, bx10, bx11);
+        _mm_store_si128((__m128i *) &l1[idx1 & 0x1FFFF0], _mm_xor_si128(bx10, cx1));
 
-        bx0 = cx0;
-        bx1 = cx1;
+        idx0 = _mm_cvtsi128_si64(cx0);
+        idx1 = _mm_cvtsi128_si64(cx1);
 
         uint64_t hi, lo, cl, ch;
         cl = ((uint64_t*) &l0[idx0 & 0x1FFFF0])[0];
         ch = ((uint64_t*) &l0[idx0 & 0x1FFFF0])[1];
+
+        VARIANT2_INTEGER_MATH(0, cl, cx0);
         lo = _umul128(idx0, cl, &hi);
+        VARIANT2_SHUFFLE2(l0, idx0 & 0x1FFFF0, ax0, bx00, bx01, hi, lo);
 
         al0 += hi;
         ah0 += lo;
-
-        VARIANT1_2(ah0, 0);
-        ((uint64_t*) &l0[idx0 & 0x1FFFF0])[0] = al0;
-        ((uint64_t*) &l0[idx0 & 0x1FFFF0])[1] = ah0;
-        VARIANT1_2(ah0, 0);
 
         ah0 ^= ch;
         al0 ^= cl;
@@ -97,19 +97,26 @@ void cryptonight_av2_aesni_double(const void *restrict input, size_t size, void 
 
         cl = ((uint64_t*) &l1[idx1 & 0x1FFFF0])[0];
         ch = ((uint64_t*) &l1[idx1 & 0x1FFFF0])[1];
+
+        VARIANT2_INTEGER_MATH(1, cl, cx1);
         lo = _umul128(idx1, cl, &hi);
+        VARIANT2_SHUFFLE2(l1, idx1 & 0x1FFFF0, ax1, bx10, bx11, hi, lo);
 
         al1 += hi;
         ah1 += lo;
 
-        VARIANT1_2(ah1, 1);
         ((uint64_t*) &l1[idx1 & 0x1FFFF0])[0] = al1;
         ((uint64_t*) &l1[idx1 & 0x1FFFF0])[1] = ah1;
-        VARIANT1_2(ah1, 1);
 
         ah1 ^= ch;
         al1 ^= cl;
         idx1 = al1;
+        
+	bx01 = bx00;
+        bx11 = bx10;
+
+        bx00 = cx0;
+        bx10 = cx1;
     }
 
     cn_implode_scratchpad((__m128i*) l0, (__m128i*) h0);

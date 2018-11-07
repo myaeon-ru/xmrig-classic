@@ -25,6 +25,27 @@
 #ifndef __CRYPTONIGHT_MONERO_H__
 #define __CRYPTONIGHT_MONERO_H__
 
+#include <fenv.h>
+#include <math.h>
+
+static inline __m128i int_sqrt_v2(const uint64_t n0)
+{
+    __m128d x = _mm_castsi128_pd(_mm_add_epi64(_mm_cvtsi64_si128(n0 >> 12), _mm_set_epi64x(0, 1023ULL << 52)));
+    x = _mm_sqrt_sd(_mm_setzero_pd(), x);
+    uint64_t r = (uint64_t)(_mm_cvtsi128_si64(_mm_castpd_si128(x)));
+
+    const uint64_t s = r >> 20;
+    r >>= 19;
+
+    uint64_t x2 = (s - (1022ULL << 32)) * (r - s - (1022ULL << 32) + 1);
+#   if (defined(_MSC_VER) || __GNUC__ > 7 || (__GNUC__ == 7 && __GNUC_MINOR__ > 1)) && (defined(__x86_64__) || defined(_M_AMD64))
+    _addcarry_u64(_subborrow_u64(0, x2, n0, (unsigned long long int*)&x2), r, 0, (unsigned long long int*)&r);
+#   else
+    if (x2 < n0) ++r;
+#   endif
+
+    return _mm_cvtsi64_si128(r);
+}
 
 // VARIANT ALTERATIONS
 #define VARIANT1_INIT(part) \
@@ -47,5 +68,48 @@
         (p) ^= tweak1_2_##part; \
     }
 
+#   define VARIANT2_INIT(part) \
+    __m128i division_result_xmm_##part = _mm_cvtsi64_si128(h##part[12]); \
+    __m128i sqrt_result_xmm_##part = _mm_cvtsi64_si128(h##part[13]);
+
+#ifdef _MSC_VER
+#  define VARIANT2_SET_ROUNDING_MODE() { _control87(RC_DOWN, MCW_RC); }
+#else
+#   define VARIANT2_SET_ROUNDING_MODE() { fesetround(FE_DOWNWARD); }
+#endif
+
+#   define VARIANT2_INTEGER_MATH(part, cl, cx) \
+    { \
+        const uint64_t sqrt_result = (uint64_t)(_mm_cvtsi128_si64(sqrt_result_xmm_##part)); \
+        const uint64_t cx_0 = _mm_cvtsi128_si64(cx); \
+        cl ^= (uint64_t)(_mm_cvtsi128_si64(division_result_xmm_##part)) ^ (sqrt_result << 32); \
+        const uint32_t d = (uint32_t)(cx_0 + (sqrt_result << 1)) | 0x80000001UL; \
+        const uint64_t cx_1 = _mm_cvtsi128_si64(_mm_srli_si128(cx, 8)); \
+        const uint64_t division_result = (uint32_t)(cx_1 / d) + ((cx_1 % d) << 32); \
+        division_result_xmm_##part = _mm_cvtsi64_si128((int64_t)(division_result)); \
+        sqrt_result_xmm_##part = int_sqrt_v2(cx_0 + division_result); \
+    }
+
+#   define VARIANT2_SHUFFLE(base_ptr, offset, _a, _b, _b1) \
+    { \
+        const __m128i chunk1 = _mm_load_si128((__m128i *)((base_ptr) + ((offset) ^ 0x10))); \
+        const __m128i chunk2 = _mm_load_si128((__m128i *)((base_ptr) + ((offset) ^ 0x20))); \
+        const __m128i chunk3 = _mm_load_si128((__m128i *)((base_ptr) + ((offset) ^ 0x30))); \
+        _mm_store_si128((__m128i *)((base_ptr) + ((offset) ^ 0x10)), _mm_add_epi64(chunk3, _b1)); \
+        _mm_store_si128((__m128i *)((base_ptr) + ((offset) ^ 0x20)), _mm_add_epi64(chunk1, _b)); \
+        _mm_store_si128((__m128i *)((base_ptr) + ((offset) ^ 0x30)), _mm_add_epi64(chunk2, _a)); \
+    }
+
+#   define VARIANT2_SHUFFLE2(base_ptr, offset, _a, _b, _b1, hi, lo) \
+    { \
+        const __m128i chunk1 = _mm_xor_si128(_mm_load_si128((__m128i *)((base_ptr) + ((offset) ^ 0x10))), _mm_set_epi64x(lo, hi)); \
+        const __m128i chunk2 = _mm_load_si128((__m128i *)((base_ptr) + ((offset) ^ 0x20))); \
+        hi ^= ((uint64_t*)((base_ptr) + ((offset) ^ 0x20)))[0]; \
+        lo ^= ((uint64_t*)((base_ptr) + ((offset) ^ 0x20)))[1]; \
+        const __m128i chunk3 = _mm_load_si128((__m128i *)((base_ptr) + ((offset) ^ 0x30))); \
+        _mm_store_si128((__m128i *)((base_ptr) + ((offset) ^ 0x10)), _mm_add_epi64(chunk3, _b1)); \
+        _mm_store_si128((__m128i *)((base_ptr) + ((offset) ^ 0x20)), _mm_add_epi64(chunk1, _b)); \
+        _mm_store_si128((__m128i *)((base_ptr) + ((offset) ^ 0x30)), _mm_add_epi64(chunk2, _a)); \
+    }
 
 #endif /* __CRYPTONIGHT_MONERO_H__ */
